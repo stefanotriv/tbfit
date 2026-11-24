@@ -2,6 +2,9 @@
 
     python tbgui.py            (needs numpy, scipy, matplotlib; tkinter comes with Python)
 
+On Windows you can double-click `run_tbgui.bat` instead: it finds Python, installs numpy,
+scipy and matplotlib if they are missing, and starts the GUI.
+
 `tbcore.py` holds all the physics and can be used without the GUI.
 
 ## Tab 1: Structure and bands
