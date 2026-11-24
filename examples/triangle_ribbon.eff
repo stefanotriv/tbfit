@@ -1,0 +1,18 @@
+# Zigzag backbone with triangulene-like triangles (picture 2). Same scheme as the
+# triangular goblet: antisymmetric tip states coupled to the neighbouring backbone sites.
+site Tu near  2.460   0.71    4.919   0.71  weights 1 -1   # up-triangle tip
+site Td near 11.068 -15.62   13.528 -15.62  weights 1 -1   # down-triangle tip
+site Bu near  3.689  -9.94                                 # backbone under the up-triangle
+site Bd near 12.298  -4.97                                 # backbone above the down-triangle
+onsite Tu eT
+onsite Td eT
+onsite Bu eB
+onsite Bd eB
+hop Bu Bd 0 tB
+hop Bd Bu 1 tB
+hop Tu Bd 0 tau
+hop Bd Tu 1 -tau
+hop Td Bu 0 -tau
+hop Td Bu 1 tau
+hop Tu Td 0 tT
+hop Td Tu 1 tT

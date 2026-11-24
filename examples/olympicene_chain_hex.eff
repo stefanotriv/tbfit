@@ -1,0 +1,14 @@
+# For olympicene_chain.hex. Olympicenyl radical chain (C19H11 units linked by single C-C bonds, alternating up/down).
+# One site per radical: the central edge carbon of the three-ring side (the dot in the drawing),
+# the atom with most weight in the two radical bands around E_F (isolated by ~1.3 eV).
+# The glide (mirror + half period) makes the A-B bond inside the cell and the B-A' bond to the
+# next cell equivalent: one hopping t. A-A' and B-B' (next cell) are the second neighbours.
+bands 0 1
+site A atom 20
+site B atom 17
+onsite A e
+onsite B e
+hop A B 0 t
+hop B A 1 t
+hop A A 1 t2
+hop B B 1 t2

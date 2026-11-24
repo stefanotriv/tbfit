@@ -1,0 +1,27 @@
+# Goblet chain: one site on each goblet tip (T) and one on the backbone edge opposite
+# each goblet (B). Goblets at 3 (up), 8 (down), 13 (up), 18 (down) half-hexagons.
+site T1 near  3.689   1.42     # up-goblet tip
+site T2 near  9.838 -24.85     # down-goblet tip
+site T3 near 15.987   1.42
+site T4 near 22.136 -24.85
+site B1 near  3.689 -14.20     # backbone bottom edge under the up-goblet
+site B2 near  9.838  -9.23     # backbone top edge above the down-goblet
+site B3 near 15.987 -14.20
+site B4 near 22.136  -9.23
+onsite T1 eT
+onsite T2 eT
+onsite T3 eT
+onsite T4 eT
+onsite B1 eB
+onsite B2 eB
+onsite B3 eB
+onsite B4 eB
+hop T1 B1 0 tau
+hop T2 B2 0 tau
+hop T3 B3 0 tau
+hop T4 B4 0 tau
+hop B1 B2 0 t1           # gap 5 (B1-B2 and B3-B4 related by C2)
+hop B3 B4 0 t1
+hop B2 B3 0 t2           # gap 5
+hop B4 B1 1 t3           # gap 7, to the next cell
+hop B1 B4 0 t4           # longer-range backbone coupling

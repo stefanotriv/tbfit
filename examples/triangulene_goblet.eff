@@ -1,0 +1,19 @@
+# Goblets with a triangular head (picture 1). The tip state is antisymmetric between the
+# two corner atoms next to the apex (weights 1 -1), so it couples to the backbone sites
+# of the NEIGHBOURING goblets with opposite signs (+tau right, -tau left).
+site Tu near  2.460   0.71    4.919   0.71  weights 1 -1   # up-goblet tip
+site Td near 11.068 -24.14   13.528 -24.14  weights 1 -1   # down-goblet tip
+site Bu near  3.689 -14.20                                 # backbone under the up-goblet
+site Bd near 12.298  -9.23                                 # backbone above the down-goblet
+onsite Tu eT
+onsite Td eT
+onsite Bu eB
+onsite Bd eB
+hop Bu Bd 0 tB           # backbone chain (uniform by mirror symmetry)
+hop Bd Bu 1 tB
+hop Tu Bd 0 tau
+hop Bd Tu 1 -tau
+hop Td Bu 0 -tau
+hop Td Bu 1 tau
+hop Tu Td 0 tT           # tip - tip
+hop Td Tu 1 tT

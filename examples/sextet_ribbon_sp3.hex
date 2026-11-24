@@ -1,0 +1,13 @@
+# ribbon drawn with Clar sextets: 64 hexagons, period 26 chars = 13 hexagons.
+# The four carbons drawn with only single bonds (no radical dot) are sp3 CH2 groups:
+# they have no pz orbital and are removed (coordinates in A, as shown in the GUI).
+.......O.O.O.........O.O.O
+O.O.O.O.O.O.O.O.O.O.O.O.O.
+.O.O.O.O.O.O.O.O.O.O.O.O.O
+O.O.O.O.O.O.O.O.O.O.O.O.O.
+.O.O.O.O.O.O.O.O.O.O.O.O.O
+O.O.O.........O.O.O.......
+remove  2.460  -0.710     # top edge, CH2 in the left notch ring
+remove 19.676  -0.710     # top edge, CH2 in the right notch ring
+remove 11.068  -9.940     # bottom edge, CH2 between the bottom bumps
+remove 28.284  -9.940     # bottom edge, CH2 at the end of the cell

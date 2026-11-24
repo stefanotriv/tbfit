@@ -1,0 +1,17 @@
+# Real goblet chain: one site on each radical head (the radical carbon of the drawing)
+# and one on the backbone edge opposite each goblet. Generated with the site builder.
+# With nearest neighbours only the radical states decouple (tau = 0: flat bands at E_F)
+# and the backbone is a uniform chain; t2, t3 add a small tip - backbone coupling.
+bands -1 2
+site Tu near  3.689   1.42     # radical carbon of the up-goblet head
+site Td near 12.298 -24.85     # radical carbon of the down-goblet head
+site Bu near  3.689 -14.20     # backbone bottom edge under the up-goblet
+site Bd near 12.298  -9.23     # backbone top edge above the down-goblet
+onsite Tu eT
+onsite Td eT
+onsite Bu eB
+onsite Bd eB
+hop Bu Bd 0 tB                 # uniform backbone chain (the goblets are evenly spaced)
+hop Bd Bu 1 tB
+hop Tu Bu 0 tau                # each head couples to the backbone under its own goblet
+hop Td Bd 0 tau

@@ -1,0 +1,8 @@
+# Olympicenyl radical chain: two C19H11 units per cell, linked by single C-C bonds,
+# alternately flipped (2 rings on top / 3 rings on top). Period 14 half-hexagons.
+# A linked pair of rings is 3 columns and 1 row apart (one empty hexagon between them);
+# rows alternate the parity of the columns (row 0 even, row 1 odd, row 2 even, row 3 odd).
+..O.O.........
+.O.O.O........
+........O.O.O.
+.........O.O..

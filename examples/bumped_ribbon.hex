@@ -1,0 +1,8 @@
+# ribbon from the drawing: 62 hexagons per cell, period 26 chars = 13 hexagons
+# the 5 dashed bonds on each side of the drawing are the bonds to the next cell
+.......O.O.O.........O.O.O
+O...O.O.O.O.O.O...O.O.O.O.
+.O.O.O.O.O.O.O.O.O.O.O.O.O
+O.O.O.O.O.O.O.O.O.O.O.O.O.
+.O.O.O.O.O.O.O.O.O.O.O.O.O
+O.O.O.........O.O.O.......

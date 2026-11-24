@@ -1,0 +1,6 @@
+# Finite molecule (28 C): two rows of three fused hexagons joined by three C-C bonds
+# (your drawing rotated by 90 degrees so that it fits the standard zigzag map).
+# Load it as a finite molecule (tab 3, "Load finite molecule"): it has no period.
+O.O.O
+.....
+O.O.O

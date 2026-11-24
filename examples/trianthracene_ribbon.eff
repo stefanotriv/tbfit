@@ -1,0 +1,16 @@
+# Ribbon from the tri-anthracene precursor (picture a). The tip state sits in the middle of
+# the outer anthracene edge (symmetric), so it couples directly to its own backbone site.
+site Tu near  3.689   1.42     # middle of the top anthracene edge
+site Td near 12.298 -16.33     # middle of the bottom anthracene edge
+site Bu near  3.689  -9.94     # backbone under the up-protrusion
+site Bd near 12.298  -4.97     # backbone above the down-protrusion
+onsite Tu eT
+onsite Td eT
+onsite Bu eB
+onsite Bd eB
+hop Bu Bd 0 tB
+hop Bd Bu 1 tB
+hop Tu Bu 0 tau
+hop Td Bd 0 tau
+hop Tu Td 0 tT
+hop Td Tu 1 tT

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE CDXML SYSTEM "http://www.cambridgesoft.com/xml/cdxml.dtd" >
+<CDXML BondLength="14.4"><page id="1"><fragment id="2">
+<n id="10" p="185.600 200.000"/>
+<n id="11" p="192.800 187.529"/>
+<n id="12" p="207.200 187.529"/>
+<n id="13" p="214.400 200.000"/>
+<n id="14" p="207.200 212.471"/>
+<n id="15" p="192.800 212.471"/>
+<n id="20" p="171.200 200.000" NodeType="GenericNickname" GenericNickname="*"><t><s>*</s></t></n>
+<n id="21" p="228.800 200.000" NodeType="GenericNickname" GenericNickname="*"><t><s>*</s></t></n>
+<b id="30" B="10" E="11" Order="2"/>
+<b id="31" B="11" E="12"/>
+<b id="32" B="12" E="13" Order="2"/>
+<b id="33" B="13" E="14"/>
+<b id="34" B="14" E="15" Order="2"/>
+<b id="35" B="15" E="10"/>
+<b id="36" B="10" E="20"/>
+<b id="37" B="13" E="21"/>
+</fragment></page></CDXML>

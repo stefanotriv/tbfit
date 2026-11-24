@@ -1,0 +1,9 @@
+# 7-armchair graphene nanoribbon (7-AGNR), 14 atoms per cell, period 3a = 4.26 A.
+# 'armchair': flat-top hexagons, each character is a column of the ribbon, each row half a
+# hexagon down; the 'O's form a checkerboard. Columns of 3 and 2 hexagons alternate.
+armchair
+O.
+.O
+O.
+.O
+O.

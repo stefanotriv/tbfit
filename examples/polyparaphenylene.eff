@@ -1,0 +1,24 @@
+# Poly(para-phenylene). The flat bands (antisymmetric under the mirror along the chain)
+# cross the frontier bands, so the bands are picked by their weight on the sites (auto).
+# The mirror-symmetric sector is an exact 4-site chain  P1 - Q1 - Q2 - P2 - P1' ...
+#   P  = para carbon,  Q = symmetric combination of the two ortho carbons
+bands auto
+site P1 near 0.71 0
+site Q1 near 1.42 1.23   1.42 -1.23
+site Q2 near 2.84 1.23   2.84 -1.23
+site P2 near 3.55 0
+onsite P1 eP
+onsite P2 eP
+onsite Q1 eQ
+onsite Q2 eQ
+hop P1 Q1 0 tPQ          # through the ring (sqrt(2) t for nearest neighbours)
+hop Q2 P2 0 tPQ
+hop Q1 Q2 0 tQQ          # ring bond parallel to the chain
+hop P2 P1 1 tinter       # inter-ring bond
+# longer-range terms, needed with 2nd/3rd-neighbour hopping (they fit to 0 for NN only)
+hop P1 Q2 0 tPQ2         # para - meta
+hop Q1 P2 0 tPQ2
+hop Q2 P1 1 tPQ2
+hop P2 Q1 1 tPQ2
+hop P1 P2 0 tPP          # para - para across the ring
+hop Q2 Q1 1 tQQ2         # across the inter-ring bond
