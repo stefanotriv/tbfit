@@ -20,6 +20,7 @@ import threading
 from math import comb
 import tbcore as tb
 import tbmany as tm
+import tbdmrg as tdm
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXAMPLES = os.path.join(HERE, "examples")
@@ -35,6 +36,9 @@ MAP_SPIN = "spin density n_up - n_dn"
 MAP_UP = "dI/dV spin up at the map energy"
 MAP_DN = "dI/dV spin down at the map energy"
 MAP_UPDN = "dI/dV up - down at the map energy"
+SOLVER_ED = "ED (exact diagonalisation)"
+SOLVER_DMRG = "DMRG (block2)"
+DMRG_MAX_AUTO_STATES = 30
 
 
 class App(tk.Tk):
@@ -1806,12 +1810,13 @@ class App(tk.Tk):
         self.sm_table = ttk.Frame(box)
         self.sm_table.pack(fill="x")
 
-        box = ttk.LabelFrame(left, text="2. Exact diagonalisation (cluster of unit cells)", padding=6)
+        box = ttk.LabelFrame(left, text="2. Many-body solution: ED or DMRG (cluster of unit cells)", padding=6)
         box.pack(fill="x", pady=(6, 0))
         ttk.Label(box, text="H = sum eps_i n_is + sum t_ij c+_is c_js\n"
                             "  + sum U_i (n_i,up - 1/2)(n_i,dn - 1/2)  [+ inter-site]\n"
                             "eps_i, t_ij: tab 2 fit; U_i: box 1; 'cells' copies",
                   foreground="#1f4e79", font=("Courier", 9)).pack(anchor="w")
+        self._solver_row(box, "sm")
         self.sm_cells, self.sm_nst = self._entry2(box, "cells", "2", "states", "auto")
         row = ttk.Frame(box)
         row.pack(fill="x")
@@ -1819,13 +1824,17 @@ class App(tk.Tk):
         ttk.Radiobutton(row, text="open chain", value="open", variable=self.sm_bc).pack(side="left")
         ttk.Radiobutton(row, text="ring (periodic)", value="ring", variable=self.sm_bc).pack(side="left")
         self.sm_keep = self._entry(box, "last cell keeps sites (blank: all)", "")
-        ttk.Label(box, text="odd chains: e.g. 3 cells, keep 'A' -> A B A B A (open chain only)",
+        ttk.Label(box, text="odd chains (open chain only): the tab 2 sites kept in the last cell,\n"
+                            "the first ones along the chain. Olympicene (sites A, B): 3 cells,\n"
+                            "keep 'A' -> A B A B A. A cell of two units with 3 sites each: 2 cells,\n"
+                            "keep the 3 sites of its first unit -> 3 units (Run ED lists the order)",
                   foreground="gray").pack(anchor="w")
         self.sm_nel = self._entry(box, "electrons (blank: neutral)", "")
         self.sm_dim = tk.StringVar(value="")
         ttk.Label(box, textvariable=self.sm_dim, foreground="gray").pack(anchor="w")
         self.sm_btn_ed = ttk.Button(box, text="Run ED", command=self.sm_run_ed)
         self.sm_btn_ed.pack(fill="x", pady=(4, 0))
+        self._solver_changed("sm")
         ttk.Label(box, text="then click a level in the spectrum: transition from the ground state\n"
                             "(spin-flip map, Delta S rule, change of <S_i.S_j>); click the ground\n"
                             "state to go back to its correlations",
@@ -1952,7 +1961,7 @@ class App(tk.Tk):
     def _sm_ed_hamiltonian(self, m, r, cl, mode, u_source="box 1"):
         """The Hamiltonian of the ED with its numbers."""
         pv, ns = r["params"], len(m.sites)
-        L = [f"Hamiltonian of the ED ({self._cells_text(cl)}, {'ring' if cl['periodic'] else 'open chain'}, "
+        L = [f"Hamiltonian of the cluster ({self._cells_text(cl)}, {'ring' if cl['periodic'] else 'open chain'}, "
              f"sites {cl['labels'][0]} .. {cl['labels'][-1]}; the digit is the cell):",
              "  H = sum_i,s eps_i n_is + sum_ij,s t_ij c+_is c_js + sum_i U_i (n_i,up - 1/2)(n_i,dn - 1/2)"
              + ("  + inter-site terms" if mode == "full" else ""),
@@ -2036,6 +2045,8 @@ class App(tk.Tk):
             periodic = self.sm_bc.get() == "ring"
             ns = len(m.sites)
             keep = self._keep_list(self.sm_keep)
+            if not self._keep_check(m, keep):
+                return
             kept = tm.cluster_keep(m, ncells, keep, periodic)
             Ns = len(kept)
             nel_neutral, per_cell = tm.neutral_filling(m, r, ncells, Ns)
@@ -2044,11 +2055,14 @@ class App(tk.Tk):
             dim = comb(Ns, nup) * comb(Ns, nel - nup)
             nsp = sum(1 for i in kept if m.sites[i % ns] in spins)
             M = comb(nsp, nsp // 2) if nsp else 1
+            solver = self._solver_opts("sm")
             nst = int(self.sm_nst.get()) if self.sm_nst.get().strip().isdigit() else min(dim, max(12, M + 4))
+            if solver[0] == "dmrg" and not self.sm_nst.get().strip().isdigit():
+                nst = min(nst, DMRG_MAX_AUTO_STATES)
             self.sm_dim.set(f"{Ns} sites, {nel} electrons: dimension {dim:,}; {nst} states"
-                            + ("  (large: may take minutes)" if dim > 3e5 else ""))
-            if dim > 3e6:
-                raise ValueError(f"dimension {dim:,} is too large for this program; use fewer cells")
+                            + ("  (large: may take minutes)" if dim > 3e5 or solver[0] == "dmrg" else ""))
+            if dim > 3e6 and solver[0] == "ed":
+                raise ValueError(f"dimension {dim:,} is too large for ED; use fewer cells or the DMRG solver")
         except Exception as e:
             messagebox.showerror("Spin model", str(e))
             return
@@ -2058,7 +2072,7 @@ class App(tk.Tk):
         def work():
             cl = tm.build_cluster(H, st, m, r["params"], ncells=ncells, periodic=periodic, U=U, mode=mode,
                                   thr=thr, EF=r["EF"], U_override=Uov or None, ph=ph, keep_last=keep)
-            res = tm.solve_cluster(cl, n_elec=nel, nstates=nst)
+            res = self._solve(cl, nel, nst, solver)
             res["levels"], res["lw"] = tm.level_weights(res)
             return cl, res
 
@@ -2071,6 +2085,7 @@ class App(tk.Tk):
                  f"(neutral: {per_cell:.2f} per cell in the model bands"
                  + (", NOT one per site" if abs(per_cell - ns) > 1e-6 else "") + "), "
                  f"{mode} interaction ({len(cl['terms'])} terms), dimension {res['dim']:,}"]
+            L += self._solver_lines(res)
             L += self._sm_ed_hamiltonian(m, r, cl, mode)
             L += [
                  "lowest states (E - E0 in meV, total S):"]
@@ -2083,7 +2098,7 @@ class App(tk.Tk):
             self._sm_log("\n".join(L))
             self.sm_draw()
 
-        self._sm_log(f"running ED (dimension {dim:,}) ...")
+        self._sm_log(f"running {'DMRG' if solver[0] == 'dmrg' else 'ED'} (dimension {dim:,}, {nst} states) ...")
         self._sm_background(work, done, self.sm_btn_ed)
 
     # ------------------------------------------------------------------ 3. spin model
@@ -2181,11 +2196,108 @@ class App(tk.Tk):
         self._sm_log("\n".join(L))
         self.sm_draw()
 
+    # ------------------------------------------------------------------ ED / DMRG selector
+    def _solver_row(self, box, pre):
+        """Solver selector (ED or DMRG) with the DMRG settings, for tabs 4 and 7."""
+        row = ttk.Frame(box)
+        row.pack(fill="x", pady=(2, 0))
+        ttk.Label(row, text="solver").pack(side="left")
+        var = tk.StringVar(value=SOLVER_ED)
+        cb = ttk.Combobox(row, textvariable=var, values=[SOLVER_ED, SOLVER_DMRG], state="readonly", width=28)
+        cb.pack(side="left", padx=4)
+        cb.bind("<<ComboboxSelected>>", lambda e: self._solver_changed(pre))
+        M, sw = self._entry2(box, "bond dim", "500", "sweeps", "24")
+        info = tk.StringVar(value="")
+        ttk.Label(box, textvariable=info, foreground="gray", justify="left").pack(anchor="w")
+        setattr(self, f"{pre}_solver", var)
+        setattr(self, f"{pre}_M", M)
+        setattr(self, f"{pre}_sweeps", sw)
+        setattr(self, f"{pre}_solver_info", info)
+
+    def _solver_changed(self, pre):
+        dmrg = getattr(self, f"{pre}_solver").get() == SOLVER_DMRG
+        btn = getattr(self, f"{pre}_btn_ed", None)
+        if btn is not None:
+            btn.configure(text="Run DMRG" if dmrg else "Run ED")
+        info = getattr(self, f"{pre}_solver_info")
+        if not dmrg:
+            info.set("ED: exact, up to about 3 million states (12-13 sites at half filling)")
+            return
+        ok, msg = tdm.available()
+        info.set(("DMRG (block2 " + msg + "): lowest states with energies, spins, correlations,\n"
+                  "spin-flip and charge spectra as with ED; for larger clusters. Check the\n"
+                  "convergence: increase the bond dimension until the energies do not change")
+                 if ok else "DMRG needs the block2 package:  python -m pip install block2")
+
+    def _solver_opts(self, pre):
+        """('ed', None) or ('dmrg', options); raises ValueError if DMRG is not available."""
+        if getattr(self, f"{pre}_solver").get() != SOLVER_DMRG:
+            return "ed", None
+        ok, msg = tdm.available()
+        if not ok:
+            raise ValueError(msg)
+        M, sw = int(getattr(self, f"{pre}_M").get()), int(getattr(self, f"{pre}_sweeps").get())
+        if M < 10 or sw < 4:
+            raise ValueError("DMRG: bond dimension >= 10 and at least 4 sweeps")
+        return "dmrg", dict(bond_dim=M, sweeps=sw)
+
+    @staticmethod
+    def _solve(cl, nel, nst, solver):
+        """Many-body states of the cluster with the selected solver."""
+        kind, opts = solver
+        if kind == "dmrg":
+            return tdm.solve_cluster(cl, n_elec=nel, nstates=nst, opts=opts)
+        return tm.solve_cluster(cl, n_elec=nel, nstates=nst)
+
+    @staticmethod
+    def _solver_lines(res):
+        if res.get("solver") == "dmrg":
+            return tdm.report(res)
+        return [f"exact diagonalisation (sparse Lanczos / dense), dimension {res['dim']:,}"]
+
     @staticmethod
     def _keep_list(var):
         """Site names typed in a 'last cell keeps' entry (None when blank)."""
         txt = var.get().replace(",", " ").split()
         return txt or None
+
+    def _sites_along_chain(self, m):
+        """The sites of the model in order along the chain: [(name, position along T in A)]."""
+        pos, T, _ = self._sm_pos(m)
+        x = pos @ (np.asarray(T, float) / np.linalg.norm(T))
+        x = np.round(x - x.min(), 1)               # sites of one unit (same x) keep the model order
+        return [(m.sites[i], float(x[i])) for i in np.lexsort((np.arange(len(x)), x))]
+
+    def _keep_check(self, m, keep):
+        """Odd chains: the names typed in 'last cell keeps sites' must be sites of the tab 2 model
+        and the first ones along the chain; otherwise the dropped sites leave a gap between the
+        previous cell and the kept ones. Raises ValueError for unknown names; for a gap asks
+        whether to run anyway. Returns True to go on."""
+        if not keep:
+            return True
+        try:
+            order = self._sites_along_chain(m)
+        except Exception:                        # sites without atoms: no positions
+            order = [(n, 0.0) for n in m.sites]
+        listing = ", ".join(f"{n} ({x:.1f} A)" for n, x in order)
+        bad = [n for n in keep if n not in m.sites]
+        if bad:
+            half = " ".join(n for n, x in order[:max(1, len(order) // 2)])
+            raise ValueError(f"unknown site(s) {' '.join(bad)} in 'last cell keeps sites'.\n\n"
+                             "Type the names of the tab 2 sites that the last cell keeps; they must be the first "
+                             f"ones along the chain. Sites of this model in order along the chain: {listing}.\n\n"
+                             f"For example '{half}' (the first half of the cell).")
+        kept = [x for n, x in order if n in keep]
+        dropped = [x for n, x in order if n not in keep]
+        if not dropped or max(kept) <= min(dropped) + 0.5:
+            return True
+        sugg = " ".join(n for n, x in order[:len(kept)])
+        return messagebox.askyesno(
+            "Partial last cell",
+            f"The last cell keeps {' '.join(keep)}, but other sites of the cell come before them along "
+            f"the chain ({listing}). Dropping those leaves a gap: the kept sites would hang on the "
+            f"previous cell only through long-range hoppings.\n\nFor a continuous chain keep '{sugg}'.\n\n"
+            "Run anyway?")
 
     @staticmethod
     def _cells_text(cl):
@@ -3292,8 +3404,9 @@ class App(tk.Tk):
         self.e6_table = ttk.Frame(box)
         self.e6_table.pack(fill="x")
 
-        box = ttk.LabelFrame(left, text="2. Exact diagonalisation (cluster of unit cells)", padding=6)
+        box = ttk.LabelFrame(left, text="2. Many-body solution: ED or DMRG (cluster of unit cells)", padding=6)
         box.pack(fill="x", pady=(6, 0))
+        self._solver_row(box, "e6")
         self.e6_cells, self.e6_nst = self._entry2(box, "cells", "2", "states", "16")
         row = ttk.Frame(box)
         row.pack(fill="x")
@@ -3301,11 +3414,15 @@ class App(tk.Tk):
         ttk.Radiobutton(row, text="open chain", value="open", variable=self.e6_bc).pack(side="left")
         ttk.Radiobutton(row, text="ring (periodic)", value="ring", variable=self.e6_bc).pack(side="left")
         self.e6_keep = self._entry(box, "last cell keeps sites (blank: all)", "")
-        ttk.Label(box, text="odd chains: e.g. 3 cells, keep 'A' -> A B A B A (open chain only)",
+        ttk.Label(box, text="odd chains (open chain only): the tab 2 sites kept in the last cell,\n"
+                            "the first ones along the chain. Olympicene (sites A, B): 3 cells,\n"
+                            "keep 'A' -> A B A B A. A cell of two units with 3 sites each: 2 cells,\n"
+                            "keep the 3 sites of its first unit -> 3 units (Run ED lists the order)",
                   foreground="gray").pack(anchor="w")
         self.e6_nel = self._entry(box, "electrons (blank: neutral)", "")
         self.e6_btn_ed = ttk.Button(box, text="Run ED", command=self.e6_run_ed)
         self.e6_btn_ed.pack(fill="x", pady=(4, 0))
+        self._solver_changed("e6")
 
         box = ttk.LabelFrame(left, text="3. Excitations: maps and tip spectra", padding=6)
         box.pack(fill="x", pady=(6, 0))
@@ -3408,14 +3525,17 @@ class App(tk.Tk):
             periodic = self.e6_bc.get() == "ring"
             ns = len(m.sites)
             keep = self._keep_list(self.e6_keep)
+            if not self._keep_check(m, keep):
+                return
             kept = tm.cluster_keep(m, ncells, keep, periodic)
             Ns = len(kept)
             nel_neutral, per_cell = tm.neutral_filling(m, r, ncells, Ns)
             nel = int(self.e6_nel.get()) if self.e6_nel.get().strip() else nel_neutral
             nup = (nel + nel % 2) // 2
             dim = comb(Ns, nup) * comb(Ns, nel - nup)
-            if dim > 3e6:
-                raise ValueError(f"dimension {dim:,} is too large; use fewer cells")
+            solver = self._solver_opts("e6")
+            if dim > 3e6 and solver[0] == "ed":
+                raise ValueError(f"dimension {dim:,} is too large for ED; use fewer cells or the DMRG solver")
             spn = {row[0] for row in self.e6["rows"] if row[2].get()}
             nsp = sum(1 for i in kept if m.sites[i % ns] in spn)
         except Exception as e:
@@ -3426,7 +3546,7 @@ class App(tk.Tk):
         def work():
             cl = tm.build_cluster(H, st, m, r["params"], ncells=ncells, periodic=periodic, U=Ua, mode="onsite",
                                   EF=r["EF"], U_override=Uov, ph=True, keep_last=keep)
-            res = tm.solve_cluster(cl, n_elec=nel, nstates=min(nst, dim))
+            res = self._solve(cl, nel, min(nst, dim), solver)
             res["levels"], res["lw"] = tm.level_weights(res)
             lev, taus, ng = tm.inelastic_amplitudes(res)
             return cl, res, (taus, ng)
@@ -3441,6 +3561,7 @@ class App(tk.Tk):
             E = res["E"] - res["E"][0]
             L = ["", f"ED: {self._cells_text(cl)} ({'ring' if periodic else 'open chain'}), {nel} electrons, "
                      f"dimension {res['dim']:,}"]
+            L += self._solver_lines(res)
             L += self._sm_ed_hamiltonian(m, r, cl, "onsite", u_source=self.e6["usrc"])
             L += ["lowest states (E - E0 in meV, total S):"]
             L += [f"  {k:3d} {1e3 * e:10.4f}   S = {s_:.2f}" for k, (e, s_) in enumerate(zip(E, res["S"]))]
@@ -3452,7 +3573,7 @@ class App(tk.Tk):
             self._e6_log("\n".join(L))
             self.e6_draw()
 
-        self._e6_log(f"running ED (dimension {dim:,}) ...")
+        self._e6_log(f"running {'DMRG' if solver[0] == 'dmrg' else 'ED'} (dimension {dim:,}) ...")
         self._sm_background(work, done, self.e6_btn_ed)
 
     def e6_run_charge(self):
@@ -3481,7 +3602,7 @@ class App(tk.Tk):
             self._e6_log("\n".join(L))
             self.e6_draw()
 
-        self._e6_log("computing the N-1 and N+1 states ...")
+        self._e6_log("computing the N-1 and N+1 states" + (" (DMRG)" if res.get("solver") == "dmrg" else "") + " ...")
         self._sm_background(work, done, self.e6_btn_ch)
 
     # ------------------------------------------------------------------ tip and clicks

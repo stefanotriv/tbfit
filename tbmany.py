@@ -458,6 +458,9 @@ def level_weights(res):
     """Spin-flip weight per effective site for every level (list from `levels`), from the
     ground level: fast version of analyse_transition (site weights only), used for the
     overview of all transitions. Returns (levels, array n_levels x Ns)."""
+    if res.get("solver") == "dmrg":           # transition amplitudes stored by tbdmrg
+        lev = res["levels"]
+        return lev, np.array([sum(spin_flip_weight(t) for t in tl) / res["n_ground"] for tl in res["taus"]])
     E, S, X = res["E"], res["S"], res["X"]
     Ns, nu, nd = res["ed"].Ns, res["n_up"], res["n_dn"]
     du, dd = comb(Ns, nu), comb(Ns, nd)
@@ -494,16 +497,22 @@ def analyse_transition(res, f_level, W=None):
     for the ED result of solve_cluster. Returns dict with dE (eV), S0, Sf, dS, site and atom
     weights (averaged over the ground level, summed over the final level), dC, dn, dS2,
     charge moved, 'allowed' (Delta S rule) and a label."""
-    E, S, X = res["E"], res["S"], res["X"]
-    Ns, nu, nd = res["ed"].Ns, res["n_up"], res["n_dn"]
-    g_level = levels(E, S)[0]
+    E, S = res["E"], res["S"]
+    if res.get("solver") == "dmrg":           # stored transition amplitudes (tbdmrg)
+        Ns = res["Ns"]
+        g_level = res["levels"][0]
+        li = [list(L) for L in res["levels"]].index(list(f_level))
+        taus = res["taus"][li]
+    else:
+        X = res["X"]
+        Ns, nu, nd = res["ed"].Ns, res["n_up"], res["n_dn"]
+        g_level = levels(E, S)[0]
+        taus = [transition_amplitudes(X[:, f], X[:, g], Ns, nu, nd) for g in g_level for f in f_level]
     ws, wa = np.zeros(Ns), None if W is None else np.zeros(W.shape[0])
-    for g in g_level:
-        for f in f_level:
-            tau = transition_amplitudes(X[:, f], X[:, g], Ns, nu, nd)
-            ws += spin_flip_weight(tau) / len(g_level)
-            if W is not None:
-                wa += spin_flip_weight(tau, W) / len(g_level)
+    for tau in taus:
+        ws += spin_flip_weight(tau) / len(g_level)
+        if W is not None:
+            wa += spin_flip_weight(tau, W) / len(g_level)
     C0, Cf = res["C"][g_level].mean(axis=0), res["C"][f_level].mean(axis=0)
     n0, nf = res["n"][g_level].mean(axis=0), res["n"][f_level].mean(axis=0)
     S0, Sf = float(np.mean(S[g_level])), float(np.mean(S[f_level]))
@@ -846,7 +855,8 @@ def cluster_keep(model, ncells, keep_last=None, periodic=False):
         keep_last = list(keep_last)
         bad = [n for n in keep_last if n not in model.sites]
         if bad:
-            raise ValueError(f"unknown site(s) {', '.join(bad)} for the last cell (sites: {', '.join(model.sites)})")
+            raise ValueError(f"unknown site(s) {', '.join(bad)} for the last cell: type names of the model sites "
+                             f"({', '.join(model.sites)}), the ones that come first along the chain")
         if periodic:
             raise ValueError("a partial last cell needs an open chain (a ring must close on whole cells)")
         if ncells < 2:
@@ -1332,6 +1342,9 @@ def charge_excitations(res, cl, nstates=12, dense_limit=2500):
     the ground level). When the ground state has S_z = 0 the two spins are equivalent and only
     spin up is computed (weights doubled).
     Returns list of dict(kind, spin, w (k,), D (n_ground, k, Ns), mult, dim)."""
+    if res.get("solver") == "dmrg":
+        import tbdmrg
+        return tbdmrg.charge_excitations(res, cl, nstates)
     Ns, nu, nd = res["ed"].Ns, res["n_up"], res["n_dn"]
     du, dd = comb(Ns, nu), comb(Ns, nd)
     g_level = levels(res["E"], res["S"])[0]
@@ -1392,6 +1405,8 @@ def dyson_map(ch, kind, index, W, spin=None):
 def inelastic_amplitudes(res):
     """Transition spin densities of every level from the ground level (for spin-flip weights at
     any tip position): list over levels of lists of tau dicts (one per ground/final state)."""
+    if res.get("solver") == "dmrg":
+        return res["levels"], res["taus"], res["n_ground"]
     Ns, nu, nd = res["ed"].Ns, res["n_up"], res["n_dn"]
     lev = levels(res["E"], res["S"])
     g_level = lev[0]

@@ -262,8 +262,8 @@ Physics (details in the docstring of `tbmany.py`):
   the largest inter-site terms in the full mode), the fitted spin Hamiltonian written bond
   by bond (J1 (S_Tu0.S_Td0 + ...)), and the mean-field Hamiltonian (atomistic, t1 t2 t3 of
   tab 1: it does not use the tab 2 model and is an independent check).
-- **Exact diagonalisation** of the effective model on a cluster of unit cells (open chain
-  or ring), at the neutral filling by default (the electrons of the fitted bands: one per
+- **Exact diagonalisation** (or DMRG for larger clusters, see "Solvers" under tab 7) of the
+  effective model on a cluster of unit cells (open chain or ring), at the neutral filling by default (the electrons of the fitted bands: one per
   site only when half of the model bands are occupied, e.g. not with an odd number of
   electrons per cell): many-body spectrum with total spin S, charges, local moments
   <S_i^2> (0.75 = free spin) and spin correlations <S_i.S_j>. Up to about 12 sites
@@ -275,6 +275,13 @@ Physics (details in the docstring of `tbmany.py`):
   U_i are those of the full cluster (the dropped sites are simply removed), the neutral
   electron count is scaled to the sites kept, and the drawing shows only the units of the
   kept sites. Open chains only. The same entry is in tab 7.
+  Type the names of your tab 2 sites, the ones that come first along the chain (the sites of the
+  first unit of the cell); otherwise the dropped sites leave a gap. "Run ED" checks this: for an
+  unknown name it lists the sites in order along the chain, and for a gap it proposes the right
+  ones. Example, `triangulene_chain.cdxml` (two units per cell, sites S1 S2 S3 on the upper unit
+  and S4 S5 S6 on the lower one, which comes first): 2 cells keeping `S4 S5 S6` give 3 units,
+  9 sites, dimension 15,876. Three full cells (18 sites, dimension about 2.4 x 10^9) or 5 units
+  (15 sites, 4 x 10^7) are beyond exact diagonalisation here (limit 3 x 10^6).
 - **Transitions (click a level in the spectrum).** For the transition from the ground state
   to the clicked level: Delta E, Delta S and the selection rule of inelastic (spin-flip)
   tunnelling, Delta S = 0, +-1 (not 0 -> 0); the spin-flip weight
@@ -419,8 +426,8 @@ Real goblet chain (U_atom = 3 eV, states S_z = 0 and 1 of tab 5): U = 0.57 eV on
 
 ## Tab 7: ED, spectra and maps
 
-Exact diagonalisation of H = sum eps_i n_is + sum t_ij c+_is c_js + sum U_i (n_i,up - 1/2)
-(n_i,dn - 1/2) on a cluster of cells (t from tab 2; U_i fitted in tab 6, projected
+Exact diagonalisation (or DMRG, see "Solvers" below) of H = sum eps_i n_is + sum t_ij c+_is c_js
++ sum U_i (n_i,up - 1/2)(n_i,dn - 1/2) on a cluster of cells (t from tab 2; U_i fitted in tab 6, projected
 U_atom sum|w|^4, or typed by hand), and what a tip would measure. "last cell keeps sites"
 makes odd chains (see tab 4), e.g. 4 cells keeping A = 7 olympicene units. Every step, with
 the equations, checks against brute-force diagonalisation and worked examples (olympicene chains
@@ -448,8 +455,81 @@ Checks: the spectral weights obey the sum rules (sum over the N - 1 states = <n_
 N + 1 states = 2 - <n_a>), reduce to the single-particle levels for U = 0, and agree with
 OpenFermion in the full Fock space (1e-13).
 
+### Solvers: exact diagonalisation or DMRG (tabs 4 and 7)
+
+Box 2 of tabs 4 and 7 has a **solver** selector:
+
+- **ED (exact diagonalisation)**: exact, up to about 3 million states in the S_z sector
+  (12 to 13 sites at half filling). Default.
+- **DMRG (block2)**: for larger clusters, e.g. three full cells of the triangulene chain
+  (18 sites, dimension 2.4 x 10^9) or long chains. Needs the `block2` package:
+
+      python -m pip install block2
+
+  (in the same Python that runs tbgui; wheels for Windows, Linux and macOS, it brings MKL).
+
+DMRG gives the same results as ED, so everything downstream works unchanged: the many-body
+spectrum with total spins, charges, local moments and <S_i.S_j>, the transition table and the
+spin-flip maps (click a level), the spin-model fit of tab 4, the inelastic spectrum at the tip
+and the charge excitations with their tip spectrum and Dyson maps (tab 7).
+
+How it works (`tbdmrg.py`):
+
+- The cluster Hamiltonian is the one the ED uses, term by term (spin-resolved hoppings with the
+  particle-hole shift, on-site U or the full projected interaction), written as a matrix product
+  operator with the U(1) x U(1) symmetry of N and S_z.
+- The sites are put along the MPS in the order of the Fiedler vector of the coupling graph, so
+  strongly coupled sites are neighbours. For the 12-site triangulene cluster this cuts the error
+  at bond dimension 300 from 0.08 meV to 1e-4 meV, and the time by 4.
+- The lowest states of the S_z sector are found one after the other with two-site DMRG, each
+  orthogonal to the ones before (energy penalty), with noise in the first sweeps. The total spin
+  comes from <S^2>; charges and <S_i.S_j> from the one- and two-particle density matrices.
+- Near-degenerate states of different spin come out slightly mixed (S looks almost exact, but
+  spin-flip weight leaks from one level to the other). Within such groups (closer than 2 meV)
+  S^2 is diagonalised and every state is replaced by the closest pure-spin state; for the
+  3-unit triangulene chain this brings the weights of two levels 0.05 meV apart back to the
+  ED values.
+- Spin-flip weights: the transition densities <f|S^z_ab|g> come from transition density matrices;
+  the S^+ and S^- parts follow from the Wigner-Eckart theorem,
+  sum_q sum_M' |<S' M'|S^q|S M>|^2 = |<S' M|S^z|S M>|^2 (2S'+1) / ((2S+1) <S M 1 0|S' M>^2).
+  Where the Clebsch-Gordan coefficient is zero (S' = S with M = 0, e.g. triplet -> triplet from
+  a triplet ground state) the states with S_z = 1 are computed as well.
+- Charge excitations: lowest states with N + 1 and N - 1 electrons and the Dyson amplitudes
+  <f|c+_a,s|0>, <f|c_a,s|0> (the ground states are recomputed in the same run).
+- block2 keeps the Python interpreter busy while it runs, so every DMRG calculation runs in a
+  separate process: the GUI stays responsive. The log reports, for every sector, the sweeps, the
+  bond dimension, the largest discarded weight and the last energy change, with a warning when
+  the discarded weight is above 1e-6 or the energies still move.
+
+Settings: **bond dim** (default 500) and **sweeps** (default 24; the sweeps stop when the
+energies change by less than 1e-10 eV). Check convergence by running again with a larger bond
+dimension: the energies must not move. In tab 4, "states auto" is limited to 30 with DMRG
+(each state costs about as much as the ground state). For clusters that ED can do, ED is faster.
+
+What DMRG is good at here: chains, i.e. the reduced models (a few sites per cell, couplings to
+the next cells). Example, triangulene chain with 6 sites per cell: 2 cells (12 sites) at bond
+dimension 300 agree with ED within 1e-4 meV; 3 cells (18 sites) at bond dimension 200 still
+discard 2e-4 of the weight (the log warns), use 500 or more. Two-dimensional pieces need much
+larger bond dimensions: the atomistic Hubbard model of [3]triangulene (22 carbons) at bond
+dimension 250 discards 3e-3 and gives a spin mixture (the log warns about both). When the
+spins in the log are not integer or half-integer, or the discarded weight is above 1e-6, the
+results are not converged.
+
+Checks (`python tests/validate_dmrg.py`, skipped when block2 is missing):
+
+| test | result |
+|---|---|
+| random clusters, full projected interaction, even and odd N; bipartite cluster with a triplet ground state (Lieb) | energies = ED within 1e-11 eV, spins 1e-10, charges and <S_i.S_j> 1e-5, spin-flip weights per site and atom, IETS and charge spectra within 1e-4 relative |
+| triangulene chain, reduced model, 3 units (9 sites) | same agreement with ED |
+| triangulene chain, 2 cells (12 sites, dimension 853,776), bond dimension 300 | 8 lowest states within 1e-4 meV of ED, same spins |
+| half-filled Hubbard chain, U = 4t, open chains of 12, 16, 20 sites, E(L) = e L + b + c/L | e = -0.573689 t, Lieb-Wu -0.573729 t |
+| free electrons, 24 sites, random 1st and 2nd neighbour hoppings (U = 0, dimension 7 x 10^12) | ground state and the degenerate singlet + triplet first excitation exact within 1e-8 eV |
+| bipartite stub chain, 18 sites, N_A - N_B = 2, U = 2t (dimension 2.4 x 10^9) | ground state S = 1 (Lieb's theorem) |
+| stability | different random starts give the same energies; energies decrease and converge with the bond dimension; the separate process gives the same result |
+
 ### Validation
 
+`python tests/validate_dmrg.py` checks the DMRG solver (section above).
 `python tests/validate_many.py` checks the many-body code against exact results (Hubbard
 dimer, Heisenberg chains and rings, Lieb theorem), against OpenFermion (exact fermionic
 Hamiltonians, including the full projected interaction; agreement 1e-13 eV) and against the
